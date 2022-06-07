@@ -19,16 +19,18 @@ class Event(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     month = db.Column(db.String, nullable=False, unique=False)
     start_date = db.Column(db.Integer, nullable=False, unique=False)
+    signups = db.Column(db.Integer, nullable=False, unique=False)
     
     def __init__(self, month, start_date):
         self.month = month
         self.start_date = start_date
+        self.signups = 0
         
 
 # Marshmallow Schemas
 class EventSchema(ma.Schema):
     class Meta:
-        fields = ("id", "month", "start_date")
+        fields = ("id", "month", "start_date", "signups")
 
 event_schema = EventSchema()
 multiple_event_schema = EventSchema(many=True)
@@ -75,12 +77,15 @@ def update_event(id):
     data = request.get_json()
     month = data.get("month")
     start_date = data.get("start_date")
+    signups = data.get("signups")
 
     record = db.session.query(Event).filter(Event.id == id).first()
     if month is not None:
         record.month = month
     if start_date is not None:
         record.start_date = start_date
+    if signups is not None:
+        record.signups = signups
     db.session.commit()
 
     return jsonify({
