@@ -217,8 +217,8 @@ def get_all_data():
     event_data = db.session.query(Event).all()
     testimonial_data = db.session.query(Testimonial).all()
     return jsonify({
-        events: multiple_event_schema.dump(event_data),
-        testimonials: multiple_testimonial_schema.dump(testimonial_data)
+        "events": multiple_event_schema.dump(event_data),
+        "testimonials": multiple_testimonial_schema.dump(testimonial_data)
     })
 
 
