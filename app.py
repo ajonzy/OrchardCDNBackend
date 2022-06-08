@@ -31,6 +31,17 @@ class Event(db.Model):
         self.lecture_time = lecture_time
         self.clinical_time = clinical_time
         self.signups = 0
+
+class Testimonial(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String, nullable=False, unique=False)
+    source = db.Column(db.String, nullable=False, unique=False)
+    text = db.Column(db.String, nullable=False, unique=False)
+    
+    def __init__(self, name, source, text):
+        self.name = name,
+        self.source = source,
+        self.text = text
         
 
 # Marshmallow Schemas
@@ -40,6 +51,13 @@ class EventSchema(ma.Schema):
 
 event_schema = EventSchema()
 multiple_event_schema = EventSchema(many=True)
+
+class TestimonialSchema(ma.Schema):
+    class Meta:
+        fields = ("id", "name", "source", "text")
+
+testimonial_schema = TestimonialSchema()
+multiple_testimonial_schema = TestimonialSchema(many=True)
 
 
 # Flask Endpoints
@@ -59,10 +77,10 @@ def add_event():
 
     data = request.get_json()
     month = data.get("month")
+    start_date = data.get("start_date")
     year = data.get("year")
     lecture_time = data.get("lecture_time")
     clinical_time = data.get("clinical_time")
-    start_date = data.get("start_date")
 
     record = Event(month, start_date, year, lecture_time, clinical_time)
     db.session.add(record)
@@ -121,6 +139,76 @@ def delete_event(id):
         "status": 200,
         "message": "Event Deleted",
         "data": event_schema.dump(record)
+    })
+
+
+@app.route("/testimonial/get", methods=["GET"])
+def get_all_testimonials():
+    data = db.session.query(Testimonial).all()
+    return jsonify(multiple_testimonial_schema.dump(data))
+
+@app.route("/testimonial/add", methods=["POST"])
+def add_testimonial():
+    if request.content_type != "application/json":
+        return jsonify({
+            "status": 400,
+            "message": "Error: Data must be sent as JSON.",
+            "data": {}
+        })
+
+    data = request.get_json()
+    name = data.get("name")
+    source = data.get("source")
+    text = data.get("text")
+
+    record = Testimonial(name, source, text)
+    db.session.add(record)
+    db.session.commit()
+
+    return jsonify({
+        "status": 200,
+        "message": "Testimonial Added",
+        "data": testimonial_schema.dump(record)
+    })
+
+@app.route("/testimonial/update/<id>", methods=["PUT"])
+def update_testimonial(id):
+    if request.content_type != "application/json":
+        return jsonify({
+            "status": 400,
+            "message": "Error: Data must be sent as JSON.",
+            "data": {}
+        })
+        
+    data = request.get_json()
+    name = data.get("name")
+    source = data.get("source")
+    text = data.get("text")
+
+    record = db.session.query(Testimonial).filter(Testimonial.id == id).first()
+    if name is not None:
+        record.name = name
+    if source is not None:
+        record.source = source
+    if text is not None:
+        record.text = text
+    db.session.commit()
+
+    return jsonify({
+        "status": 200,
+        "message": "Testimonial Updated",
+        "data": testimonial_schema.dump(record)
+    })
+
+@app.route("/testimonial/delete/<id>", methods=["DELETE"])
+def delete_testimonial(id):
+    record = db.session.query(Testimonial).filter(Testimonial.id == id).first()
+    db.session.delete(record)
+    db.session.commit()
+    return jsonify({
+        "status": 200,
+        "message": "Testimonial Deleted",
+        "data": testimonial_schema.dump(record)
     })
 
 
