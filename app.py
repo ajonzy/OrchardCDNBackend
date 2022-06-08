@@ -212,5 +212,15 @@ def delete_testimonial(id):
     })
 
 
+@app.route("/data", methods=["GET"])
+def get_all_data():
+    event_data = db.session.query(Event).all()
+    testimonial_data = db.session.query(Testimonial).all()
+    return jsonify({
+        events: multiple_event_schema.dump(event_data),
+        testimonials: multiple_testimonial_schema.dump(testimonial_data)
+    })
+
+
 if __name__ == "__main__":
     app.run(debug=True)
