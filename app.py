@@ -3,7 +3,9 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_marshmallow import Marshmallow
 from flask_cors import CORS
 from dotenv import load_dotenv
+import requests
 import os
+import uuid
 
 load_dotenv()
 
@@ -314,6 +316,39 @@ def delete_message(id):
         "message": "Message Deleted",
         "data": message_schema.dump(record)
     })
+
+
+@app.route("/payment", methods=["POST"])
+def handle_payment():
+    if request.content_type != "application/json":
+        return jsonify({
+            "status": 400,
+            "message": "Error: Data must be sent as JSON.",
+            "data": {}
+        })
+        
+    data = request.get_json()
+    source_id = data.get("nonce")
+    verification_token = data.get("token")
+    amount = data.get("amount")
+    if amount is not None:
+        amount *= 100
+
+    payload = {
+        "source_id": source_id,
+        "verification_token": verification_token,
+        "autocomplete": True,
+        "location_id": os.environ.get("SQUARE_LOCATION_ID"),
+        "amount_money": {
+            "amount": amount,
+            "currency": "USD"
+        },
+        "idempotency_key": str(uuid.uuid4())
+    }
+
+    url = "https://connect.squareupsandbox.com/v2/payments" #TODO: Update url from snadbox url to production url
+    r = requests.post(url, json=payload, headers={"Authorization": f"Bearer {os.environ.get('SQUARE_ACCESS_TOKEN')}"})
+    return r.json()
 
 
 @app.route("/data", methods=["GET"])

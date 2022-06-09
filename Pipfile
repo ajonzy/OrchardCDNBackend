@@ -12,6 +12,7 @@ flask-cors = "*"
 gunicorn = "*"
 psycopg2 = "*"
 python-dotenv = "*"
+requests = "*"
 
 [dev-packages]
 
