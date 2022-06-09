@@ -32,6 +32,7 @@ class Event(db.Model):
         self.clinical_time = clinical_time
         self.signups = 0
 
+
 class Testimonial(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String, nullable=False, unique=False)
@@ -42,6 +43,22 @@ class Testimonial(db.Model):
         self.name = name,
         self.source = source,
         self.text = text
+
+
+class Message(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    first_name = db.Column(db.String, nullable=False, unique=False)
+    last_name = db.Column(db.String, nullable=False, unique=False)
+    email = db.Column(db.String, nullable=False, unique=False)
+    phone = db.Column(db.String, nullable=False, unique=False)
+    message = db.Column(db.String, nullable=False, unique=False)
+    
+    def __init__(self, first_name, last_name, email, phone, message):
+        self.first_name = first_name
+        self.last_name = last_name
+        self.email = email
+        self.phone = phone
+        self.message = message
         
 
 # Marshmallow Schemas
@@ -52,12 +69,21 @@ class EventSchema(ma.Schema):
 event_schema = EventSchema()
 multiple_event_schema = EventSchema(many=True)
 
+
 class TestimonialSchema(ma.Schema):
     class Meta:
         fields = ("id", "name", "source", "text")
 
 testimonial_schema = TestimonialSchema()
 multiple_testimonial_schema = TestimonialSchema(many=True)
+
+
+class MessageSchema(ma.Schema):
+    class Meta:
+        fields = ("id", "first_name", "last_name", "email", "phone", "message")
+
+message_schema = MessageSchema()
+multiple_message_schema = MessageSchema(many=True)
 
 
 # Flask Endpoints
@@ -209,6 +235,84 @@ def delete_testimonial(id):
         "status": 200,
         "message": "Testimonial Deleted",
         "data": testimonial_schema.dump(record)
+    })
+
+
+@app.route("/message/get", methods=["GET"])
+def get_all_messages():
+    data = db.session.query(Message).all()
+    return jsonify(multiple_message_schema.dump(data))
+
+@app.route("/message/add", methods=["POST"])
+def add_message():
+    if request.content_type != "application/json":
+        return jsonify({
+            "status": 400,
+            "message": "Error: Data must be sent as JSON.",
+            "data": {}
+        })
+
+    data = request.get_json()
+    first_name = data.get("first_name")
+    last_name = data.get("last_name")
+    email = data.get("email")
+    phone = data.get("phone")
+    message = data.get("message")
+
+    record = Message(first_name, last_name, email, phone, message)
+    db.session.add(record)
+    db.session.commit()
+
+    return jsonify({
+        "status": 200,
+        "message": "Message Added",
+        "data": message_schema.dump(record)
+    })
+
+@app.route("/message/update/<id>", methods=["PUT"])
+def update_message(id):
+    if request.content_type != "application/json":
+        return jsonify({
+            "status": 400,
+            "message": "Error: Data must be sent as JSON.",
+            "data": {}
+        })
+        
+    data = request.get_json()
+    first_name = data.get("first_name")
+    last_name = data.get("last_name")
+    email = data.get("email")
+    phone = data.get("phone")
+    message = data.get("message")
+
+    record = db.session.query(Message).filter(Message.id == id).first()
+    if first_name is not None:
+        record.first_name = first_name
+    if last_name is not None:
+        record.last_name = last_name
+    if email is not None:
+        record.email = email
+    if phone is not None:
+        record.phone = phone
+    if message is not None:
+        record.message = message
+    db.session.commit()
+
+    return jsonify({
+        "status": 200,
+        "message": "Message Updated",
+        "data": message_schema.dump(record)
+    })
+
+@app.route("/message/delete/<id>", methods=["DELETE"])
+def delete_message(id):
+    record = db.session.query(Message).filter(Message.id == id).first()
+    db.session.delete(record)
+    db.session.commit()
+    return jsonify({
+        "status": 200,
+        "message": "Message Deleted",
+        "data": message_schema.dump(record)
     })
 
 
