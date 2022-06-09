@@ -471,5 +471,13 @@ def get_all_data():
     })
 
 
+@app.route("/data/keys", methods=["GET"])
+def get_key_data():
+    return jsonify({
+        "SQUARE_APPLICATION_ID": os.environ.get("SQUARE_APPLICATION_ID"),
+        "SQUARE_LOCATION_ID": os.environ.get("SQUARE_LOCATION_ID")
+    })
+
+
 if __name__ == "__main__":
     app.run(debug=True)
