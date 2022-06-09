@@ -1,6 +1,6 @@
 from flask import Flask, request, jsonify
 from flask_sqlalchemy import SQLAlchemy
-from flask_marshmallow import Marshmallow
+from flask_marshmallow import Marshmallow, base_fields
 from flask_cors import CORS
 from dotenv import load_dotenv
 import requests
@@ -24,7 +24,8 @@ class Event(db.Model):
     year = db.Column(db.Integer, nullable=False, unique=False)
     lecture_time = db.Column(db.String, nullable=False, unique=False)
     clinical_time = db.Column(db.String, nullable=False, unique=False)
-    signups = db.Column(db.Integer, nullable=False, unique=False)
+    archived = db.Column(db.Boolean, nullable=False, unique=False)
+    registrations = db.relationship("Registration", backref="event", cascade='all, delete, delete-orphan')
     
     def __init__(self, month, start_date, year, lecture_time, clinical_time):
         self.month = month
@@ -32,7 +33,7 @@ class Event(db.Model):
         self.year = year
         self.lecture_time = lecture_time
         self.clinical_time = clinical_time
-        self.signups = 0
+        self.archived = False
 
 
 class Testimonial(db.Model):
@@ -61,12 +62,31 @@ class Message(db.Model):
         self.email = email
         self.phone = phone
         self.message = message
+
+
+class Registration(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    first_name = db.Column(db.String, nullable=False, unique=False)
+    last_name = db.Column(db.String, nullable=False, unique=False)
+    email = db.Column(db.String, nullable=False, unique=False)
+    phone = db.Column(db.String, nullable=False, unique=False)
+    amount_paid = db.Column(db.Float, nullable=False, unique=False)
+    event_id = db.Column(db.Integer, db.ForeignKey("event.id"), nullable=False, unique=False)
+    
+    def __init__(self, first_name, last_name, email, phone, amount_paid, event_id):
+        self.first_name = first_name
+        self.last_name = last_name
+        self.email = email
+        self.phone = phone
+        self.amount_paid = amount_paid
+        self.event_id = event_id
         
 
 # Marshmallow Schemas
 class EventSchema(ma.Schema):
     class Meta:
-        fields = ("id", "month", "start_date", "year", "lecture_time", "clinical_time", "signups")
+        fields = ("id", "month", "start_date", "year", "lecture_time", "clinical_time", "archived", "registrations_count")
+    registrations_count = base_fields.Function(lambda fields: len(fields.registrations))
 
 event_schema = EventSchema()
 multiple_event_schema = EventSchema(many=True)
@@ -86,6 +106,14 @@ class MessageSchema(ma.Schema):
 
 message_schema = MessageSchema()
 multiple_message_schema = MessageSchema(many=True)
+
+
+class RegistrationSchema(ma.Schema):
+    class Meta:
+        fields = ("id", "first_name", "last_name", "email", "phone", "amount_paid", "event_id")
+
+registration_schema = RegistrationSchema()
+multiple_registration_schema = RegistrationSchema(many=True)
 
 
 # Flask Endpoints
@@ -135,7 +163,7 @@ def update_event(id):
     year = data.get("year")
     lecture_time = data.get("lecture_time")
     clinical_time = data.get("clinical_time")
-    signups = data.get("signups")
+    archived = data.get("archived")
 
     record = db.session.query(Event).filter(Event.id == id).first()
     if month is not None:
@@ -148,8 +176,8 @@ def update_event(id):
         record.lecture_time = lecture_time
     if clinical_time is not None:
         record.clinical_time = clinical_time
-    if signups is not None:
-        record.signups = signups
+    if archived is not None:
+        record.archived = archived
     db.session.commit()
 
     return jsonify({
@@ -318,6 +346,88 @@ def delete_message(id):
     })
 
 
+@app.route("/registration/get", methods=["GET"])
+def get_all_registrations():
+    data = db.session.query(Registration).all()
+    return jsonify(multiple_registration_schema.dump(data))
+
+@app.route("/registration/add", methods=["POST"])
+def add_registration():
+    if request.content_type != "application/json":
+        return jsonify({
+            "status": 400,
+            "message": "Error: Data must be sent as JSON.",
+            "data": {}
+        })
+
+    data = request.get_json()
+    first_name = data.get("first_name")
+    last_name = data.get("last_name")
+    email = data.get("email")
+    phone = data.get("phone")
+    amount_paid = data.get("amount_paid")
+    event_id = data.get("event_id")
+
+    record = Registration(first_name, last_name, email, phone, amount_paid, event_id)
+    db.session.add(record)
+    db.session.commit()
+
+    return jsonify({
+        "status": 200,
+        "message": "Registration Added",
+        "data": registration_schema.dump(record)
+    })
+
+@app.route("/registration/update/<id>", methods=["PUT"])
+def update_registration(id):
+    if request.content_type != "application/json":
+        return jsonify({
+            "status": 400,
+            "message": "Error: Data must be sent as JSON.",
+            "data": {}
+        })
+        
+    data = request.get_json()
+    first_name = data.get("first_name")
+    last_name = data.get("last_name")
+    email = data.get("email")
+    phone = data.get("phone")
+    amount_paid = data.get("amount_paid")
+    event_id = data.get("event_id")
+
+    record = db.session.query(Registration).filter(Registration.id == id).first()
+    if first_name is not None:
+        record.first_name = first_name
+    if last_name is not None:
+        record.last_name = last_name
+    if email is not None:
+        record.email = email
+    if phone is not None:
+        record.phone = phone
+    if amount_paid is not None:
+        record.amount_paid = amount_paid
+    if event_id is not None:
+        record.event_id = event_id
+    db.session.commit()
+
+    return jsonify({
+        "status": 200,
+        "message": "Registration Updated",
+        "data": registration_schema.dump(record)
+    })
+
+@app.route("/registration/delete/<id>", methods=["DELETE"])
+def delete_registration(id):
+    record = db.session.query(Registration).filter(Registration.id == id).first()
+    db.session.delete(record)
+    db.session.commit()
+    return jsonify({
+        "status": 200,
+        "message": "Registration Deleted",
+        "data": registration_schema.dump(record)
+    })
+
+
 @app.route("/payment", methods=["POST"])
 def handle_payment():
     if request.content_type != "application/json":
@@ -353,7 +463,7 @@ def handle_payment():
 
 @app.route("/data", methods=["GET"])
 def get_all_data():
-    event_data = db.session.query(Event).all()
+    event_data = db.session.query(Event).filter(Event.archived == False).all()
     testimonial_data = db.session.query(Testimonial).all()
     return jsonify({
         "events": multiple_event_schema.dump(event_data),
